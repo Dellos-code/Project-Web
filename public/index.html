@@ -116,9 +116,12 @@
 
             <!-- 2. FEED & MAP VIEW -->
             <section id="feed-view" class="view hidden">
-                <div>
-                    <h2>Αγγελίες Φαγητού</h2>
-                    <p style="color:var(--muted)">Βρες γεύματα κοντά σου στο Campus. Κόστος: 1🪙</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h2 style="margin: 0;">Αγγελίες Φαγητού</h2>
+                        <p style="margin: 0; color:var(--muted)">Βρες γεύματα κοντά σου στο Campus. Κόστος: 1🪙</p>
+                    </div>
+                    <button id="btn-filter-location" class="btn-primary" style="width: auto;">Φιλτράρισμα βάσει Τοποθεσίας</button>
                 </div>
                 <div id="map"></div> <!-- Leaflet Map -->
                 <div id="posts-container" class="feed-grid"></div>
@@ -186,6 +189,15 @@
         let isLoginMode = true;
         let map = null;
         let mapMarkers = [];
+        let currentPosts = [];
+
+        const CAMPUS_BASE_LAT = 38.2882;
+        const CAMPUS_BASE_LNG = 21.7889;
+        const USER_MARKER_ICON = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+        });
 
         // -- INIT --
         function initApp() {
@@ -293,7 +305,7 @@
         function initMap() {
             if (!map) {
                 // Κέντρο στο Πανεπιστήμιο Πατρών (Ρίο)
-                map = L.map('map').setView([38.2882, 21.7889], 14);
+                map = L.map('map').setView([CAMPUS_BASE_LAT, CAMPUS_BASE_LNG], 14);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
             }
         }
@@ -307,39 +319,99 @@
 
             try {
                 const res = await fetch('/api/posts');
-                const posts = await res.json();
-                container.innerHTML = '';
-
-                posts.forEach((post, index) => {
-                    // Γκριζάρισμα αν 0 μερίδες (Οδηγία PDF)
-                    const isSoldOut = post.portions_available === 0;
-                    
-                    const card = document.createElement('div');
-                    card.className = 'food-card';
-                    if (isSoldOut) card.style.opacity = '0.5';
-
-                    card.innerHTML = `
-                        <div class="food-tag" style="${isSoldOut ? 'background:#888;color:white;' : ''}">
-                            ${isSoldOut ? 'Εξαντλήθηκε' : `${post.portions_available} Μερίδες`}
-                        </div>
-                        <h3>${post.title}</h3>
-                        <p>👨‍🍳 ${post.cook_name} | 📍 ${post.pickup_location} | 🕒 ${post.pickup_time}</p>
-                        ${post.allergens ? `<p style="color:red; font-size:0.85rem">⚠️ ${post.allergens}</p>` : ''}
-                        ${!isSoldOut && post.cook_id !== currentUser.id ? 
-                            `<button class="btn-primary" onclick="requestPortion(${post.id})">Κράτηση (1 🪙)</button>` : ''}
-                    `;
-                    container.appendChild(card);
-
-                    // Προσθήκη Marker στο χάρτη (με μικρή τυχαία απόκλιση για να μη πέφτουν το ένα πάνω στο άλλο)
-                    if (!isSoldOut) {
-                        const lat = 38.2882 + (Math.random() - 0.5) * 0.01;
-                        const lng = 21.7889 + (Math.random() - 0.5) * 0.01;
-                        const marker = L.marker([lat, lng]).addTo(map)
-                            .bindPopup(`<b>${post.title}</b><br>${post.pickup_location}`);
-                        mapMarkers.push(marker);
-                    }
+                currentPosts = await res.json();
+                
+                // Assign dummy lat/lng so they remain stable across re-renders
+                currentPosts.forEach(post => {
+                    // Deterministic dummy coords based on post id
+                    post.lat = CAMPUS_BASE_LAT + ((post.id * 0.011) % 0.02) - 0.01;
+                    post.lng = CAMPUS_BASE_LNG + ((post.id * 0.017) % 0.02) - 0.01;
                 });
+                
+                renderFeed(currentPosts);
             } catch (err) { console.error(err); }
+        }
+
+        function renderFeed(posts) {
+            const container = document.getElementById('posts-container');
+            container.innerHTML = '';
+            mapMarkers.forEach(m => map.removeLayer(m));
+            mapMarkers = [];
+
+            posts.forEach((post, index) => {
+                // Γκριζάρισμα αν 0 μερίδες (Οδηγία PDF)
+                const isSoldOut = post.portions_available === 0;
+                
+                const card = document.createElement('div');
+                card.className = 'food-card';
+                if (isSoldOut) card.style.opacity = '0.5';
+
+                card.innerHTML = `
+                    <div class="food-tag" style="${isSoldOut ? 'background:#888;color:white;' : ''}">
+                        ${isSoldOut ? 'Εξαντλήθηκε' : `${post.portions_available} Μερίδες`}
+                    </div>
+                    <h3>${post.title}</h3>
+                    <p>👨‍🍳 ${post.cook_name} | 📍 ${post.pickup_location} | 🕒 ${post.pickup_time}</p>
+                    ${post.distance !== undefined ? `<p style="color:var(--primary-dark); font-weight:bold;">📏 ${post.distance.toFixed(2)} km μακριά</p>` : ''}
+                    ${post.allergens ? `<p style="color:red; font-size:0.85rem">⚠️ ${post.allergens}</p>` : ''}
+                    ${!isSoldOut && post.cook_id !== currentUser.id ? 
+                        `<button class="btn-primary" onclick="requestPortion(${post.id})">Κράτηση (1 🪙)</button>` : ''}
+                `;
+                container.appendChild(card);
+
+                // Προσθήκη Marker στο χάρτη
+                if (!isSoldOut) {
+                    const marker = L.marker([post.lat, post.lng]).addTo(map)
+                        .bindPopup(`<b>${post.title}</b><br>${post.pickup_location}`);
+                    mapMarkers.push(marker);
+                }
+            });
+        }
+
+        // Φιλτράρισμα βάσει Τοποθεσίας (Γ1)
+        document.getElementById('btn-filter-location').addEventListener('click', () => {
+            if (!navigator.geolocation) {
+                alert('Η γεωτοποθεσία δεν υποστηρίζεται από τον browser σου.');
+                return;
+            }
+            navigator.geolocation.getCurrentPosition((position) => {
+                const userLat = position.coords.latitude;
+                const userLng = position.coords.longitude;
+                
+                // Calculate distance for each post using Haversine formula
+                currentPosts.forEach(post => {
+                    post.distance = getDistanceFromLatLonInKm(userLat, userLng, post.lat, post.lng);
+                });
+
+                // Sort posts: closest first
+                currentPosts.sort((a, b) => a.distance - b.distance);
+                
+                renderFeed(currentPosts);
+
+                const userMarker = L.marker([userLat, userLng], { icon: USER_MARKER_ICON }).addTo(map)
+                    .bindPopup('<b>Εσύ είσαι εδώ</b>').openPopup();
+                mapMarkers.push(userMarker);
+                map.setView([userLat, userLng], 14);
+                
+            }, (error) => {
+                alert('Σφάλμα λήψης τοποθεσίας: ' + error.message);
+            });
+        });
+
+        function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of the earth in km
+            const dLat = deg2rad(lat2 - lat1);
+            const dLon = deg2rad(lon2 - lon1); 
+            const a = 
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+                Math.sin(dLon / 2) * Math.sin(dLon / 2); 
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
+            return R * c; // Distance in km
+        }
+
+        function deg2rad(deg) {
+            return deg * (Math.PI / 180);
         }
 
         async function requestPortion(postId) {
