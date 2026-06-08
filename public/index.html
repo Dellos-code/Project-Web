@@ -188,7 +188,7 @@
                         <input id="post-title" type="text" placeholder="Τίτλος (π.χ. Μακαρόνια)" required />
                         <input id="post-photo" type="url" placeholder="URL Φωτογραφίας (προαιρετικό)" />
                         <input id="post-location" type="text" placeholder="Τοποθεσία (π.χ. Εστία Β)" required />
-                        <input id="post-time" type="text" placeholder="Ώρα (π.χ. 14:00)" required />
+                        <input id="post-time" type="time" placeholder="Ώρα" required />
                         <input id="post-portions" type="number" min="1" placeholder="Μερίδες" required />
                         <input id="post-allergens" type="text" placeholder="Αλλεργιογόνα" />
                         <textarea id="post-notes" placeholder="Επιπλέον Σημειώσεις (προαιρετικό)"></textarea>
@@ -312,6 +312,7 @@
                 // Fetch actual credits from DB to keep UI fresh
                 fetchCredits(currentUser.id);
 
+                document.getElementById('btn-admin').classList.add('hidden');
                 if (currentUser.role === 'admin') {
                     document.getElementById('btn-admin').classList.remove('hidden');
                 }

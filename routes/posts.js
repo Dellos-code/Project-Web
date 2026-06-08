@@ -6,6 +6,8 @@ const db = require('../database');
 router.post('/', (req, res) => {
     const { cook_id, title, notes, photo_url, pickup_location, pickup_time, portions, allergens } = req.body;
     if (!cook_id || !title || !pickup_location || !pickup_time || !portions) return res.status(400).json({ error: 'Λείπουν υποχρεωτικά πεδία.' });
+    if (portions <= 0) return res.status(400).json({ error: 'Οι μερίδες πρέπει να είναι τουλάχιστον 1.' });
+    if (portions <= 0) return res.status(400).json({ error: 'Οι μερίδες πρέπει να είναι τουλάχιστον 1.' });
 
     const query = `
         INSERT INTO posts 
@@ -26,7 +28,7 @@ router.get('/', (req, res) => {
         SELECT p.*, u.name as cook_name 
         FROM posts p
         JOIN users u ON p.cook_id = u.id
-        WHERE p.expires_at > datetime('now')
+        WHERE p.expires_at > datetime('now') AND p.status != 'deleted'
         ORDER BY p.created_at DESC
     `;
     db.all(query, [], (err, posts) => {
@@ -37,7 +39,7 @@ router.get('/', (req, res) => {
 
 // Ανάκτηση αγγελιών ενός Μάγειρα (Για το Dashboard του)
 router.get('/cook/:id', (req, res) => {
-    const query = `SELECT * FROM posts WHERE cook_id = ? ORDER BY created_at DESC`;
+    const query = `SELECT * FROM posts WHERE cook_id = ? AND status != 'deleted' ORDER BY created_at DESC`;
     db.all(query, [req.params.id], (err, posts) => {
         if (err) return res.status(500).json({ error: 'Σφάλμα ανάκτησης.' });
         res.json(posts);
@@ -55,9 +57,10 @@ router.put('/:id', (req, res) => {
         
         if (post.cook_id !== cook_id) return res.status(403).json({ error: 'Μη εξουσιοδοτημένη ενέργεια.' });
         
+        if (portions <= 0) return res.status(400).json({ error: 'Οι μερίδες πρέπει να είναι τουλάχιστον 1.' });
         const reserved = post.portions_total - post.portions_available;
         if (portions < reserved) {
-            return res.status(400).json({ error: \`Δεν μπορείτε να μειώσετε τις μερίδες κάτω από \${reserved} (έχουν ήδη κρατηθεί).\` });
+            return res.status(400).json({ error: `Δεν μπορείτε να μειώσετε τις μερίδες κάτω από ${reserved} (έχουν ήδη κρατηθεί).` });
         }
         
         const newAvailable = portions - reserved;
@@ -78,7 +81,7 @@ router.put('/:id', (req, res) => {
 
 // Διαγραφή αγγελίας (CRUD)
 router.delete('/:id', (req, res) => {
-    db.run(`DELETE FROM posts WHERE id = ?`, [req.params.id], function(err) {
+    db.run(`UPDATE posts SET status = 'deleted', expires_at = datetime('now', '-1 second') WHERE id = ?`, [req.params.id], function(err) {
         if (err) return res.status(500).json({ error: 'Σφάλμα διαγραφής.' });
         res.json({ message: 'Η αγγελία διαγράφηκε.' });
     });
