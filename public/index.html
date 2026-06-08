@@ -17,6 +17,7 @@
             --radius: 14px;
         }
         * { box-sizing: border-box; }
+        html { scroll-padding-top: 5rem; scroll-behavior: smooth; }
         body { margin: 0; font-family: "Inter", sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
         .hidden { display: none !important; }
         .app-shell { width: min(1200px, 100% - 2rem); margin: 1rem auto 2rem; }
@@ -53,12 +54,9 @@
         .form-panel { 
             display: grid; gap: 0.8rem; padding: 1.8rem; 
             background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); 
-            transition: box-shadow 0.2s ease, transform 0.2s ease;
+            
         }
-        .form-panel:hover {
-            box-shadow: var(--shadow-hover);
-            transform: translateY(-2px);
-        }
+        
         
         label { font-size: 0.88rem; font-weight: 600; color: var(--text); }
         input, textarea, select { font: inherit; padding: 0.75rem; border-radius: 10px; border: 1px solid #d1d5db; width: 100%; outline:none; transition: border-color 0.2s; color: var(--text); }
