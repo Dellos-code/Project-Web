@@ -46,12 +46,14 @@ router.get('/cook/:id', (req, res) => {
 
 // Επεξεργασία αγγελίας (CRUD)
 router.put('/:id', (req, res) => {
-    const { title, notes, photo_url, pickup_location, pickup_time, portions, allergens } = req.body;
+    const { cook_id, title, notes, photo_url, pickup_location, pickup_time, portions, allergens } = req.body;
     
     // Validate portions is >= portions_total - portions_available
-    const checkQuery = `SELECT portions_total, portions_available FROM posts WHERE id = ?`;
+    const checkQuery = `SELECT cook_id, portions_total, portions_available FROM posts WHERE id = ?`;
     db.get(checkQuery, [req.params.id], (err, post) => {
         if (err || !post) return res.status(404).json({ error: 'Η αγγελία δεν βρέθηκε.' });
+        
+        if (post.cook_id !== cook_id) return res.status(403).json({ error: 'Μη εξουσιοδοτημένη ενέργεια.' });
         
         const reserved = post.portions_total - post.portions_available;
         if (portions < reserved) {

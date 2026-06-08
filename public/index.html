@@ -226,6 +226,10 @@
                         <h3>Top Donors (Leaderboard)</h3>
                         <ul id="admin-leaderboard" style="padding-left: 1.5rem;"></ul>
                     </div>
+                    <div class="card form-panel">
+                        <h3>Highest-Rated Meals</h3>
+                        <ul id="admin-top-meals" style="padding-left: 1.5rem;"></ul>
+                    </div>
                 </div>
             </section>
         </main>
@@ -269,6 +273,19 @@
                 navigate('auth');
                 updateNavbar();
             };
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag] || tag)
+            );
         }
 
         function navigate(view) {
@@ -397,15 +414,15 @@
                 if (isSoldOut) card.style.opacity = '0.5';
 
                 card.innerHTML = \`
-                    \${post.photo_url ? \`<img src="\${post.photo_url}" alt="\${post.title}" style="width:100%; height:150px; object-fit:cover; border-radius: var(--radius) var(--radius) 0 0; margin: -1.2rem -1.2rem 0.6rem -1.2rem; max-width: calc(100% + 2.4rem);">\` : ''}
+                    \${post.photo_url ? \`<img src="\${escapeHTML(post.photo_url)}" alt="\${escapeHTML(post.title)}" style="width:100%; height:150px; object-fit:cover; border-radius: var(--radius) var(--radius) 0 0; margin: -1.2rem -1.2rem 0.6rem -1.2rem; max-width: calc(100% + 2.4rem);">\` : ''}
                     <div class="food-tag" style="\${isSoldOut ? 'background:#888;color:white;' : ''}">
                         \${isSoldOut ? 'Εξαντλήθηκε' : \`\${post.portions_available} Μερίδες\`}
                     </div>
-                    <h3>\${post.title}</h3>
-                    <p>👨‍🍳 \${post.cook_name} | 📍 \${post.pickup_location} | 🕒 \${post.pickup_time}</p>
+                    <h3>\${escapeHTML(post.title)}</h3>
+                    <p>👨‍🍳 \${escapeHTML(post.cook_name)} | 📍 \${escapeHTML(post.pickup_location)} | 🕒 \${escapeHTML(post.pickup_time)}</p>
                     \${post.distance !== undefined ? \`<p style="color:var(--primary-dark); font-weight:bold;">📏 \${post.distance.toFixed(2)} km μακριά</p>\` : ''}
-                    \${post.notes ? \`<p style="font-size:0.9rem; color:var(--muted); margin:0.2rem 0;">📝 \${post.notes}</p>\` : ''}
-                    \${post.allergens ? \`<p style="color:red; font-size:0.85rem">⚠️ \${post.allergens}</p>\` : ''}
+                    \${post.notes ? \`<p style="font-size:0.9rem; color:var(--muted); margin:0.2rem 0;">📝 \${escapeHTML(post.notes)}</p>\` : ''}
+                    \${post.allergens ? \`<p style="color:red; font-size:0.85rem">⚠️ \${escapeHTML(post.allergens)}</p>\` : ''}
                     \${!isSoldOut && post.cook_id !== currentUser.id ? 
                         \`<button class="btn-primary" onclick="requestPortion(\${post.id})">Κράτηση (1 🪙)</button>\` : ''}
                 \`;
@@ -516,7 +533,7 @@
                     }
 
                     card.innerHTML = `
-                        <h4>${item.title} (Μάγειρας: ${item.cook_name})</h4>
+                        <h4>${escapeHTML(item.title)} (Μάγειρας: ${escapeHTML(item.cook_name)})</h4>
                         <p>Status Αιτήματος: <span class="badge">${item.req_status}</span> | Status Παράδοσης: <span class="badge">${item.del_status || 'N/A'}</span></p>
                         ${actionHtml}
                     `;
@@ -605,7 +622,7 @@
                 currentMyPosts = await res.json();
                 container.innerHTML = currentMyPosts.map(p => \`
                     <div style="border-bottom:1px solid #ccc; padding-bottom:10px; margin-bottom:10px;">
-                        <strong>\${p.title}</strong> - \${p.portions_available}/\${p.portions_total} Μερίδες
+                        <strong>\${escapeHTML(p.title)}</strong> - \${p.portions_available}/\${p.portions_total} Μερίδες
                         <div style="float:right; display:flex; gap: 0.5rem;">
                             <button class="btn-small bg-blue" onclick="editPost(\${p.id})">Επεξεργασία</button>
                             <button class="btn-small bg-red" onclick="deletePost(\${p.id})">Διαγραφή</button>
@@ -663,12 +680,19 @@
                 document.getElementById('admin-total-deliveries').textContent = stats.total_deliveries;
 
                 const resBoard = await fetch('/api/admin/leaderboard');
-                const board = await resBoard.json();
-                document.getElementById('admin-leaderboard').innerHTML = board.map((u, i) => `
+                const data = await resBoard.json();
+                
+                document.getElementById('admin-leaderboard').innerHTML = (data.donors || []).map((u, i) => \`
                     <li style="margin-bottom:0.5rem">
-                        <strong>#${i+1} ${u.name}</strong> - ${u.total_portions_donated} Μερίδες Δωρεά
+                        <strong>#\${i+1} \${u.name}</strong> - \${u.total_portions_donated} Μερίδες Δωρεά
                     </li>
-                `).join('');
+                \`).join('');
+
+                document.getElementById('admin-top-meals').innerHTML = (data.meals || []).map((m, i) => \`
+                    <li style="margin-bottom:0.5rem">
+                        <strong>#\${i+1} \${m.title}</strong> (\${m.cook_name}) - \${Number(m.avg_score).toFixed(1)} ⭐
+                    </li>
+                \`).join('');
             } catch(e) {}
         }
 
