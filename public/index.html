@@ -8,9 +8,13 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
-            --bg: #f7f8fa; --surface: #ffffff; --primary: #ff7a00; --primary-dark: #d96600;
-            --primary-light: #fff4ec; --text: #202328; --muted: #667085; --border: #e6e8ec;
-            --shadow: 0 10px 24px rgba(17, 24, 39, 0.08); --radius: 14px;
+            --bg: #f7f8fa; --surface: #ffffff; --primary: #e66a00;
+            --primary-dark: #cc5c00;
+            --primary-light: #fff4ec; --text: #111827; --muted: #4b5563;
+            --border: #e5e7eb;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); 
+            --shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --radius: 14px;
         }
         * { box-sizing: border-box; }
         body { margin: 0; font-family: "Inter", sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
@@ -21,53 +25,96 @@
         .view { display: grid; gap: 1.5rem; padding: 1.5rem; }
         
         /* Navbar */
-        .navbar { display: flex; flex-direction: column; gap: 0.85rem; padding: 1rem; position: sticky; top: 0.5rem; z-index: 1000; }
+        .navbar { 
+            display: flex; flex-direction: column; gap: 0.85rem; padding: 1rem; 
+            position: sticky; top: 0; z-index: 1000; 
+            background: var(--surface);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            border-bottom: 1px solid var(--border);
+        }
         .brand { display: flex; align-items: center; gap: 0.75rem; }
         .brand-logo { font-size: 1.8rem; background: #fff2e8; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; }
         .brand h1 { margin: 0; font-size: 1.2rem; }
         .brand p { margin: 0; color: var(--muted); font-size: 0.82rem; }
         .nav-links-list { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem; }
-        .nav-btn { background: #f1f3f7; border: none; color: var(--text); border-radius: 999px; padding: 0.5rem 1rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .nav-btn { background: #f3f4f6; border: none; color: var(--text); border-radius: 999px; padding: 0.5rem 1rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: 0.2s; }
         .nav-btn:hover, .nav-btn.active { background: var(--primary-light); color: var(--primary-dark); }
         .user-credits { display: flex; align-items: center; gap: 0.8rem; align-self: flex-start; }
-        .credits-badge { padding: 0.4rem 0.8rem; background: var(--primary-light); border-radius: 999px; color: var(--primary-dark); }
-        .btn-logout { background: transparent; border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem 0.6rem; color: var(--muted); cursor: pointer; }
+        .credits-badge { padding: 0.4rem 0.8rem; background: var(--primary-light); border-radius: 999px; color: var(--primary-dark); font-weight: 600; }
+        .btn-logout { background: transparent; border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem 0.6rem; color: var(--muted); cursor: pointer; transition: 0.2s; }
+        .btn-logout:hover { background: #f3f4f6; color: var(--text); }
         
         /* Forms & Buttons */
         .auth-wrapper { max-width: 450px; margin: 0 auto; width: 100%; }
         .form-switch { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; justify-content: center; }
-        .tab { border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 0.5rem 1.5rem; font-weight: 600; color: var(--muted); cursor: pointer; }
-        .tab.active { background: var(--primary-light); border-color: #ffd8bd; color: var(--primary-dark); }
-        .form-panel { display: grid; gap: 0.8rem; padding: 1.5rem; background: #fafbfc; border: 1px solid var(--border); border-radius: var(--radius); }
-        label { font-size: 0.88rem; font-weight: 600; }
-        input, textarea, select { font: inherit; padding: 0.75rem; border-radius: 10px; border: 1px solid #d8dde6; width: 100%; outline:none; }
-        input:focus { border-color: var(--primary); }
+        .tab { border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 0.5rem 1.5rem; font-weight: 600; color: var(--muted); cursor: pointer; transition: 0.2s; }
+        .tab.active { background: var(--primary-light); border-color: var(--primary-light); color: var(--primary-dark); }
+        
+        .form-panel { 
+            display: grid; gap: 0.8rem; padding: 1.8rem; 
+            background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); 
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
+        }
+        .form-panel:hover {
+            box-shadow: var(--shadow-hover);
+            transform: translateY(-2px);
+        }
+        
+        label { font-size: 0.88rem; font-weight: 600; color: var(--text); }
+        input, textarea, select { font: inherit; padding: 0.75rem; border-radius: 10px; border: 1px solid #d1d5db; width: 100%; outline:none; transition: border-color 0.2s; color: var(--text); }
+        input:focus, textarea:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-light); }
         .btn-primary { border: none; border-radius: 10px; padding: 0.8rem 1rem; background: var(--primary); color: #fff; font-weight: 700; cursor: pointer; transition: 0.2s; width: 100%; }
-        .btn-small { padding: 0.4rem 0.8rem; font-size: 0.85rem; border-radius: 6px; cursor: pointer; border:none; color:white;}
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-small { padding: 0.4rem 0.8rem; font-size: 0.85rem; border-radius: 6px; cursor: pointer; border:none; color:white; transition: 0.2s; }
+        .btn-small:hover { filter: brightness(0.9); }
         .bg-green { background: #198754; } .bg-red { background: #dc3545; } .bg-blue { background: #0d6efd; }
         
         /* Grid & Cards */
-        .feed-grid, .list-grid { display: grid; gap: 1.2rem; }
-        .food-card, .list-item { padding: 1.2rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; gap: 0.6rem; }
-        .food-tag { align-self: flex-start; background: var(--primary-light); color: var(--primary-dark); padding: 0.3rem 0.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: bold; }
-        .food-card h3 { margin: 0.2rem 0; font-size: 1.2rem; }
+        .feed-grid, .list-grid { display: grid; gap: 1.5rem; }
+        
+        .food-card, .list-item { 
+            padding: 1.5rem; 
+            background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); 
+            display: flex; flex-direction: column; gap: 0.8rem; 
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .food-card:hover, .list-item:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-hover);
+        }
+        
+        .food-tag { align-self: flex-start; background: var(--primary-light); color: var(--primary-dark); padding: 0.3rem 0.8rem; border-radius: 999px; font-size: 0.85rem; font-weight: bold; }
+        .food-card h3 { margin: 0.2rem 0; font-size: 1.2rem; color: var(--text); }
+        .food-card p { margin: 0; color: var(--muted); font-size: 0.95rem; line-height: 1.4; }
         
         /* Map */
-        #map { height: 350px; width: 100%; border-radius: var(--radius); z-index: 1; border: 1px solid var(--border); margin-bottom: 1rem;}
+        #map { 
+            height: 50vh; 
+            min-height: 350px; 
+            max-height: 600px;
+            width: 100%; 
+            border-radius: var(--radius); 
+            z-index: 1; 
+            border: 1px solid var(--border); 
+            margin-bottom: 1rem;
+        }
         
         /* Admin & Cook layout */
         .dashboard-layout { display: grid; gap: 1.5rem; }
-        .badge { display:inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; background:#eee; }
-        .badge-pending { background: #fff3cd; color: #856404; }
-        .badge-approved { background: #d1e7dd; color: #0f5132; }
+        .badge { display:inline-block; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; background:#f3f4f6; color: var(--text); }
+        .badge-pending { background: #fef3c7; color: #92400e; }
+        .badge-approved { background: #d1fae5; color: #065f46; }
         
         @media (min-width: 768px) {
-            .navbar { flex-direction: row; justify-content: space-between; align-items: center; }
+            .navbar { flex-direction: row; justify-content: space-between; align-items: center; padding: 1rem 2rem; }
             .user-credits { align-self: center; }
             .feed-grid { grid-template-columns: repeat(2, 1fr); }
-            .dashboard-layout { grid-template-columns: 1fr 1fr; align-items: start; }
+            .dashboard-layout { grid-template-columns: repeat(2, 1fr); align-items: start; }
         }
-        @media (min-width: 1024px) { .feed-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (min-width: 1024px) { 
+            .feed-grid { grid-template-columns: repeat(3, 1fr); } 
+            .dashboard-layout { grid-template-columns: repeat(3, 1fr); }
+        }
     </style>
 </head>
 <body>
