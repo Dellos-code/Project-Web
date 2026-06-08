@@ -7,7 +7,6 @@ router.post('/', (req, res) => {
     const { cook_id, title, notes, photo_url, pickup_location, pickup_time, portions, allergens } = req.body;
     if (!cook_id || !title || !pickup_location || !pickup_time || !portions) return res.status(400).json({ error: 'Λείπουν υποχρεωτικά πεδία.' });
     if (portions <= 0) return res.status(400).json({ error: 'Οι μερίδες πρέπει να είναι τουλάχιστον 1.' });
-    if (portions <= 0) return res.status(400).json({ error: 'Οι μερίδες πρέπει να είναι τουλάχιστον 1.' });
 
     const query = `
         INSERT INTO posts 
