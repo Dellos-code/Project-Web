@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniBite | Student Food Sharing</title>
+    <!-- Ενσωμάτωση Leaflet CSS για τον Χάρτη -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --bg: #f7f8fa; --surface: #ffffff; --primary: #ff7a00; --primary-dark: #d96600;
+            --primary-light: #fff4ec; --text: #202328; --muted: #667085; --border: #e6e8ec;
+            --shadow: 0 10px 24px rgba(17, 24, 39, 0.08); --radius: 14px;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Inter", sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+        .hidden { display: none !important; }
+        .app-shell { width: min(1200px, 100% - 2rem); margin: 1rem auto 2rem; }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+        main { display: grid; gap: 1.1rem; margin-top: 1.1rem; }
+        .view { display: grid; gap: 1.5rem; padding: 1.5rem; }
+        
+        /* Navbar */
+        .navbar { display: flex; flex-direction: column; gap: 0.85rem; padding: 1rem; position: sticky; top: 0.5rem; z-index: 1000; }
+        .brand { display: flex; align-items: center; gap: 0.75rem; }
+        .brand-logo { font-size: 1.8rem; background: #fff2e8; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; }
+        .brand h1 { margin: 0; font-size: 1.2rem; }
+        .brand p { margin: 0; color: var(--muted); font-size: 0.82rem; }
+        .nav-links-list { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .nav-btn { background: #f1f3f7; border: none; color: var(--text); border-radius: 999px; padding: 0.5rem 1rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .nav-btn:hover, .nav-btn.active { background: var(--primary-light); color: var(--primary-dark); }
+        .user-credits { display: flex; align-items: center; gap: 0.8rem; align-self: flex-start; }
+        .credits-badge { padding: 0.4rem 0.8rem; background: var(--primary-light); border-radius: 999px; color: var(--primary-dark); }
+        .btn-logout { background: transparent; border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem 0.6rem; color: var(--muted); cursor: pointer; }
+        
+        /* Forms & Buttons */
+        .auth-wrapper { max-width: 450px; margin: 0 auto; width: 100%; }
+        .form-switch { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; justify-content: center; }
+        .tab { border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 0.5rem 1.5rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+        .tab.active { background: var(--primary-light); border-color: #ffd8bd; color: var(--primary-dark); }
+        .form-panel { display: grid; gap: 0.8rem; padding: 1.5rem; background: #fafbfc; border: 1px solid var(--border); border-radius: var(--radius); }
+        label { font-size: 0.88rem; font-weight: 600; }
+        input, textarea, select { font: inherit; padding: 0.75rem; border-radius: 10px; border: 1px solid #d8dde6; width: 100%; outline:none; }
+        input:focus { border-color: var(--primary); }
+        .btn-primary { border: none; border-radius: 10px; padding: 0.8rem 1rem; background: var(--primary); color: #fff; font-weight: 700; cursor: pointer; transition: 0.2s; width: 100%; }
+        .btn-small { padding: 0.4rem 0.8rem; font-size: 0.85rem; border-radius: 6px; cursor: pointer; border:none; color:white;}
+        .bg-green { background: #198754; } .bg-red { background: #dc3545; } .bg-blue { background: #0d6efd; }
+        
+        /* Grid & Cards */
+        .feed-grid, .list-grid { display: grid; gap: 1.2rem; }
+        .food-card, .list-item { padding: 1.2rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; gap: 0.6rem; }
+        .food-tag { align-self: flex-start; background: var(--primary-light); color: var(--primary-dark); padding: 0.3rem 0.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: bold; }
+        .food-card h3 { margin: 0.2rem 0; font-size: 1.2rem; }
+        
+        /* Map */
+        #map { height: 350px; width: 100%; border-radius: var(--radius); z-index: 1; border: 1px solid var(--border); margin-bottom: 1rem;}
+        
+        /* Admin & Cook layout */
+        .dashboard-layout { display: grid; gap: 1.5rem; }
+        .badge { display:inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; background:#eee; }
+        .badge-pending { background: #fff3cd; color: #856404; }
+        .badge-approved { background: #d1e7dd; color: #0f5132; }
+        
+        @media (min-width: 768px) {
+            .navbar { flex-direction: row; justify-content: space-between; align-items: center; }
+            .user-credits { align-self: center; }
+            .feed-grid { grid-template-columns: repeat(2, 1fr); }
+            .dashboard-layout { grid-template-columns: 1fr 1fr; align-items: start; }
+        }
+        @media (min-width: 1024px) { .feed-grid { grid-template-columns: repeat(3, 1fr); } }
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <!-- NAVBAR -->
+        <header id="navbar" class="navbar card">
+            <div class="brand">
+                <span class="brand-logo">🍽️</span>
+                <div><h1>UniBite</h1><p>Student Food Sharing</p></div>
+            </div>
+            <nav id="nav-links" class="hidden">
+                <ul class="nav-links-list">
+                    <li><button id="btn-feed" class="nav-btn active">Feed & Χάρτης</button></li>
+                    <li><button id="btn-history" class="nav-btn">Οι Κρατήσεις μου</button></li>
+                    <li><button id="btn-cook" class="nav-btn">Cook Dashboard</button></li>
+                    <li><button id="btn-admin" class="nav-btn hidden" style="background:#dc3545; color:white;">Admin</button></li>
+                </ul>
+            </nav>
+            <div id="user-info" class="user-credits hidden">
+                <span id="user-name"></span>
+                <div class="credits-badge"><strong>🪙 <span id="user-credits"></span></strong></div>
+                <button id="btn-logout" class="btn-logout">Έξοδος</button>
+            </div>
+        </header>
+
+        <main>
+            <!-- 1. AUTH VIEW -->
+            <section id="auth-view" class="view card">
+                <div class="auth-wrapper">
+                    <div class="form-switch">
+                        <button id="tab-login" type="button" class="tab active" onclick="switchAuth(true)">Σύνδεση</button>
+                        <button id="tab-register" type="button" class="tab" onclick="switchAuth(false)">Εγγραφή</button>
+                    </div>
+                    <form id="auth-form" class="form-panel" onsubmit="handleAuth(event)">
+                        <label id="lbl-name" class="hidden">Όνομα</label>
+                        <input id="auth-name" type="text" class="hidden" placeholder="π.χ. Μαρία" />
+                        <label>Email</label>
+                        <input id="auth-email" type="email" placeholder="you@upatras.gr" required />
+                        <label>Κωδικός</label>
+                        <input id="auth-password" type="password" required />
+                        <div id="auth-error" style="color:red; font-size:0.9rem;"></div>
+                        <button id="auth-submit-btn" type="submit" class="btn-primary">Είσοδος</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- 2. FEED & MAP VIEW -->
+            <section id="feed-view" class="view hidden">
+                <div>
+                    <h2>Αγγελίες Φαγητού</h2>
+                    <p style="color:var(--muted)">Βρες γεύματα κοντά σου στο Campus. Κόστος: 1🪙</p>
+                </div>
+                <div id="map"></div> <!-- Leaflet Map -->
+                <div id="posts-container" class="feed-grid"></div>
+            </section>
+
+            <!-- 3. CONSUMER HISTORY & RATINGS -->
+            <section id="history-view" class="view hidden">
+                <h2>Το Ιστορικό μου & Αξιολογήσεις</h2>
+                <div id="history-container" class="list-grid"></div>
+            </section>
+
+            <!-- 4. COOK DASHBOARD -->
+            <section id="cook-view" class="view hidden">
+                <h2>Cook Dashboard</h2>
+                <div class="dashboard-layout">
+                    <!-- Νέα Αγγελία -->
+                    <form id="create-post-form" class="card form-panel" onsubmit="createPost(event)">
+                        <h3>Νέα Αγγελία</h3>
+                        <input id="post-title" type="text" placeholder="Τίτλος (π.χ. Μακαρόνια)" required />
+                        <input id="post-location" type="text" placeholder="Τοποθεσία (π.χ. Εστία Β)" required />
+                        <input id="post-time" type="text" placeholder="Ώρα (π.χ. 14:00)" required />
+                        <input id="post-portions" type="number" min="1" placeholder="Μερίδες" required />
+                        <input id="post-allergens" type="text" placeholder="Αλλεργιογόνα" />
+                        <button type="submit" class="btn-primary">Δημοσίευση</button>
+                    </form>
+                    
+                    <div>
+                        <!-- Διαχείριση δικών μου αγγελιών -->
+                        <div class="card form-panel" style="margin-bottom:1rem;">
+                            <h3>Οι Ενεργές Αγγελίες μου</h3>
+                            <div id="my-posts-container"></div>
+                        </div>
+                        <!-- Εισερχόμενα Αιτήματα -->
+                        <div class="card form-panel">
+                            <h3>Αιτήματα & Παραδόσεις</h3>
+                            <div id="requests-container"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. ADMIN DASHBOARD -->
+            <section id="admin-view" class="view hidden">
+                <h2>Πίνακας Ελέγχου Διαχειριστή</h2>
+                <div class="dashboard-layout">
+                    <div class="card form-panel">
+                        <h3>Στατιστικά Μήνα</h3>
+                        <h1 id="admin-total-deliveries" style="color:var(--primary); font-size:3rem; margin:0;">0</h1>
+                        <p>Επιτυχείς Παραδόσεις (Μερίδες) τον τελευταίο μήνα</p>
+                    </div>
+                    <div class="card form-panel">
+                        <h3>Top Donors (Leaderboard)</h3>
+                        <ul id="admin-leaderboard" style="padding-left: 1.5rem;"></ul>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // -- STATE --
+        let currentUser = JSON.parse(localStorage.getItem('unibite_user')) || null;
+        let isLoginMode = true;
+        let map = null;
+        let mapMarkers = [];
+
+        // -- INIT --
+        function initApp() {
+            if (currentUser) {
+                updateNavbar();
+                navigate('feed');
+            } else {
+                navigate('auth');
+            }
+            
+            // Navigation Listeners
+            document.getElementById('btn-feed').onclick = () => navigate('feed');
+            document.getElementById('btn-history').onclick = () => navigate('history');
+            document.getElementById('btn-cook').onclick = () => navigate('cook');
+            document.getElementById('btn-admin').onclick = () => navigate('admin');
+            document.getElementById('btn-logout').onclick = () => {
+                localStorage.removeItem('unibite_user');
+                currentUser = null;
+                navigate('auth');
+                updateNavbar();
+            };
+        }
+
+        function navigate(view) {
+            document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(`${view}-view`).classList.remove('hidden');
+            if(document.getElementById(`btn-${view}`)) document.getElementById(`btn-${view}`).classList.add('active');
+
+            if (view === 'feed') loadFeed();
+            if (view === 'history') loadHistory();
+            if (view === 'cook') { loadMyPosts(); loadMyRequests(); }
+            if (view === 'admin') loadAdminData();
+        }
+
+        function updateNavbar() {
+            const nav = document.getElementById('nav-links');
+            const info = document.getElementById('user-info');
+            if (currentUser) {
+                nav.classList.remove('hidden');
+                info.classList.remove('hidden');
+                document.getElementById('user-name').textContent = currentUser.name;
+                
+                // Fetch actual credits from DB to keep UI fresh
+                fetchCredits(currentUser.id);
+
+                if (currentUser.role === 'admin') {
+                    document.getElementById('btn-admin').classList.remove('hidden');
+                }
+            } else {
+                nav.classList.add('hidden');
+                info.classList.add('hidden');
+            }
+        }
+
+        async function fetchCredits(userId) {
+            try {
+                // Χρησιμοποιούμε fake login (re-fetch) για τα credits, ή απλά τα κρατάμε τοπικά αν βαριόμαστε. 
+                // Εδώ απλά δείχνουμε την τιμή localStorage.
+                document.getElementById('user-credits').textContent = currentUser.credits;
+            } catch(e) {}
+        }
+
+        // -- AUTH --
+        function switchAuth(isLogin) {
+            isLoginMode = isLogin;
+            document.getElementById('tab-login').classList.toggle('active', isLogin);
+            document.getElementById('tab-register').classList.toggle('active', !isLogin);
+            document.getElementById('lbl-name').classList.toggle('hidden', isLogin);
+            document.getElementById('auth-name').classList.toggle('hidden', isLogin);
+            document.getElementById('auth-name').required = !isLogin;
+            document.getElementById('auth-submit-btn').textContent = isLogin ? 'Είσοδος' : 'Εγγραφή & +5🪙';
+        }
+
+        async function handleAuth(e) {
+            e.preventDefault();
+            const payload = { email: document.getElementById('auth-email').value, password: document.getElementById('auth-password').value };
+            let url = '/api/auth/login';
+            if (!isLoginMode) {
+                url = '/api/auth/register';
+                payload.name = document.getElementById('auth-name').value;
+            }
+
+            try {
+                const res = await fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+
+                if (isLoginMode) {
+                    currentUser = data.user;
+                    localStorage.setItem('unibite_user', JSON.stringify(currentUser));
+                    updateNavbar();
+                    navigate('feed');
+                } else {
+                    alert('Επιτυχής εγγραφή! Τώρα κάνε σύνδεση.');
+                    switchAuth(true);
+                }
+            } catch (err) {
+                document.getElementById('auth-error').textContent = err.message;
+            }
+        }
+
+        // -- FEED & MAP (Γ1) --
+        function initMap() {
+            if (!map) {
+                // Κέντρο στο Πανεπιστήμιο Πατρών (Ρίο)
+                map = L.map('map').setView([38.2882, 21.7889], 14);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+            }
+        }
+
+        async function loadFeed() {
+            initMap();
+            mapMarkers.forEach(m => map.removeLayer(m));
+            mapMarkers = [];
+            const container = document.getElementById('posts-container');
+            container.innerHTML = '<p>Φόρτωση...</p>';
+
+            try {
+                const res = await fetch('/api/posts');
+                const posts = await res.json();
+                container.innerHTML = '';
+
+                posts.forEach((post, index) => {
+                    // Γκριζάρισμα αν 0 μερίδες (Οδηγία PDF)
+                    const isSoldOut = post.portions_available === 0;
+                    
+                    const card = document.createElement('div');
+                    card.className = 'food-card';
+                    if (isSoldOut) card.style.opacity = '0.5';
+
+                    card.innerHTML = `
+                        <div class="food-tag" style="${isSoldOut ? 'background:#888;color:white;' : ''}">
+                            ${isSoldOut ? 'Εξαντλήθηκε' : `${post.portions_available} Μερίδες`}
+                        </div>
+                        <h3>${post.title}</h3>
+                        <p>👨‍🍳 ${post.cook_name} | 📍 ${post.pickup_location} | 🕒 ${post.pickup_time}</p>
+                        ${post.allergens ? `<p style="color:red; font-size:0.85rem">⚠️ ${post.allergens}</p>` : ''}
+                        ${!isSoldOut && post.cook_id !== currentUser.id ? 
+                            `<button class="btn-primary" onclick="requestPortion(${post.id})">Κράτηση (1 🪙)</button>` : ''}
+                    `;
+                    container.appendChild(card);
+
+                    // Προσθήκη Marker στο χάρτη (με μικρή τυχαία απόκλιση για να μη πέφτουν το ένα πάνω στο άλλο)
+                    if (!isSoldOut) {
+                        const lat = 38.2882 + (Math.random() - 0.5) * 0.01;
+                        const lng = 21.7889 + (Math.random() - 0.5) * 0.01;
+                        const marker = L.marker([lat, lng]).addTo(map)
+                            .bindPopup(`<b>${post.title}</b><br>${post.pickup_location}`);
+                        mapMarkers.push(marker);
+                    }
+                });
+            } catch (err) { console.error(err); }
+        }
+
+        async function requestPortion(postId) {
+            if (currentUser.credits < 1) return alert('Δεν έχεις 1 credit!');
+            try {
+                const res = await fetch('/api/business/request', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ post_id: postId, consumer_id: currentUser.id })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+                
+                alert('Το αίτημα στάλθηκε!');
+                currentUser.credits -= 1;
+                localStorage.setItem('unibite_user', JSON.stringify(currentUser));
+                updateNavbar();
+                loadFeed();
+            } catch(e) { alert(e.message); }
+        }
+
+        // -- CONSUMER HISTORY & RATINGS (Γ3) --
+        async function loadHistory() {
+            const container = document.getElementById('history-container');
+            container.innerHTML = '<p>Φόρτωση...</p>';
+            try {
+                const res = await fetch(`/api/business/consumer-history/${currentUser.id}`);
+                const history = await res.json();
+                container.innerHTML = '';
+                
+                history.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'list-item';
+                    
+                    let actionHtml = '';
+                    if (item.del_status === 'completed' && !item.score) {
+                        actionHtml = `
+                            <div style="margin-top:10px; display:flex; gap:10px;">
+                                <select id="rating-score-${item.delivery_id}" style="width:auto;">
+                                    <option value="5">5 Αστέρια ⭐⭐⭐⭐⭐</option>
+                                    <option value="4">4 Αστέρια ⭐⭐⭐⭐</option>
+                                    <option value="3">3 Αστέρια ⭐⭐⭐</option>
+                                    <option value="2">2 Αστέρια ⭐⭐</option>
+                                    <option value="1">1 Αστέρι ⭐</option>
+                                </select>
+                                <button class="btn-primary" style="width:auto;" onclick="submitRating(${item.delivery_id})">Βαθμολόγησε</button>
+                            </div>
+                        `;
+                    } else if (item.score) {
+                        actionHtml = `<p style="color:green; font-weight:bold;">Βαθμολόγησες με: ${item.score}/5</p>`;
+                    }
+
+                    card.innerHTML = `
+                        <h4>${item.title} (Μάγειρας: ${item.cook_name})</h4>
+                        <p>Status Αιτήματος: <span class="badge">${item.req_status}</span> | Status Παράδοσης: <span class="badge">${item.del_status || 'N/A'}</span></p>
+                        ${actionHtml}
+                    `;
+                    container.appendChild(card);
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        async function submitRating(deliveryId) {
+            const score = document.getElementById(`rating-score-${deliveryId}`).value;
+            try {
+                const res = await fetch('/api/business/rate', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ delivery_id: deliveryId, rater_id: currentUser.id, score: parseInt(score) })
+                });
+                if(res.ok) { alert('Ευχαριστούμε για τη βαθμολογία!'); loadHistory(); }
+            } catch(e) { alert('Σφάλμα'); }
+        }
+
+        // -- COOK DASHBOARD (B1, B3) --
+        async function createPost(e) {
+            e.preventDefault();
+            const payload = {
+                cook_id: currentUser.id, title: document.getElementById('post-title').value,
+                pickup_location: document.getElementById('post-location').value,
+                pickup_time: document.getElementById('post-time').value,
+                portions: document.getElementById('post-portions').value,
+                allergens: document.getElementById('post-allergens').value
+            };
+            try {
+                const res = await fetch('/api/posts', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+                if (res.ok) { document.getElementById('create-post-form').reset(); loadMyPosts(); }
+            } catch(e) {}
+        }
+
+        async function loadMyPosts() {
+            const container = document.getElementById('my-posts-container');
+            try {
+                const res = await fetch(`/api/posts/cook/${currentUser.id}`);
+                const posts = await res.json();
+                container.innerHTML = posts.map(p => `
+                    <div style="border-bottom:1px solid #ccc; padding-bottom:10px; margin-bottom:10px;">
+                        <strong>${p.title}</strong> - ${p.portions_available}/${p.portions_total} Μερίδες
+                        <button class="btn-small bg-red" style="float:right;" onclick="deletePost(${p.id})">Διαγραφή</button>
+                    </div>
+                `).join('');
+            } catch(e){}
+        }
+
+        async function deletePost(id) {
+            if(confirm('Σίγουρα θέλεις να διαγράψεις την αγγελία;')) {
+                await fetch(`/api/posts/${id}`, {method: 'DELETE'});
+                loadMyPosts();
+            }
+        }
+
+        async function loadMyRequests() {
+            const container = document.getElementById('requests-container');
+            try {
+                const res = await fetch(`/api/business/cook-requests/${currentUser.id}`);
+                const reqs = await res.json();
+                container.innerHTML = reqs.map(r => {
+                    let btns = '';
+                    if (r.status === 'pending') {
+                        btns = `
+                            <button class="btn-small bg-green" onclick="handleReq('/api/business/approve', {request_id: ${r.request_id}, post_id: ${r.post_id}})">Έγκριση</button>
+                            <button class="btn-small bg-red" onclick="handleReq('/api/business/reject', {request_id: ${r.request_id}})">Απόρριψη</button>
+                        `;
+                    } else if (r.status === 'approved' && r.delivery_status === 'pending') {
+                        btns = `
+                            <button class="btn-small bg-blue" onclick="handleReq('/api/business/complete-delivery', {delivery_id: ${r.delivery_id}})">Παραδόθηκε</button>
+                            <button class="btn-small bg-red" onclick="handleReq('/api/business/noshow', {delivery_id: ${r.delivery_id}, consumer_id: ${r.consumer_id}})">Δεν ήρθε (No-Show)</button>
+                        `;
+                    }
+                    return `<div style="border-bottom:1px solid #ccc; padding-bottom:10px; margin-bottom:10px;">
+                        <strong>${r.title}</strong> -> Από: ${r.consumer_name} (Status: ${r.status}) <br>
+                        ${btns}
+                    </div>`;
+                }).join('');
+            } catch(e){}
+        }
+
+        async function handleReq(url, body) {
+            try {
+                await fetch(url, {method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+                loadMyRequests(); loadMyPosts();
+            } catch(e){}
+        }
+
+        // -- ADMIN DASHBOARD (Δ1, Δ2) --
+        async function loadAdminData() {
+            try {
+                const resStats = await fetch('/api/admin/stats');
+                const stats = await resStats.json();
+                document.getElementById('admin-total-deliveries').textContent = stats.total_deliveries;
+
+                const resBoard = await fetch('/api/admin/leaderboard');
+                const board = await resBoard.json();
+                document.getElementById('admin-leaderboard').innerHTML = board.map((u, i) => `
+                    <li style="margin-bottom:0.5rem">
+                        <strong>#${i+1} ${u.name}</strong> - ${u.total_portions_donated} Μερίδες Δωρεά
+                    </li>
+                `).join('');
+            } catch(e) {}
+        }
+
+        // Εκκίνηση εφαρμογής
+        initApp();
+    </script>
+</body>
+</html>
