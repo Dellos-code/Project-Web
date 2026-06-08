@@ -182,15 +182,20 @@
             <section id="cook-view" class="view hidden">
                 <h2>Cook Dashboard</h2>
                 <div class="dashboard-layout">
-                    <!-- Νέα Αγγελία -->
-                    <form id="create-post-form" class="card form-panel" onsubmit="createPost(event)">
-                        <h3>Νέα Αγγελία</h3>
+                    <!-- Νέα / Επεξεργασία Αγγελίας -->
+                    <form id="create-post-form" class="card form-panel" onsubmit="handlePostSubmit(event)">
+                        <h3 id="form-post-title">Νέα Αγγελία</h3>
                         <input id="post-title" type="text" placeholder="Τίτλος (π.χ. Μακαρόνια)" required />
+                        <input id="post-photo" type="url" placeholder="URL Φωτογραφίας (προαιρετικό)" />
                         <input id="post-location" type="text" placeholder="Τοποθεσία (π.χ. Εστία Β)" required />
                         <input id="post-time" type="text" placeholder="Ώρα (π.χ. 14:00)" required />
                         <input id="post-portions" type="number" min="1" placeholder="Μερίδες" required />
                         <input id="post-allergens" type="text" placeholder="Αλλεργιογόνα" />
-                        <button type="submit" class="btn-primary">Δημοσίευση</button>
+                        <textarea id="post-notes" placeholder="Επιπλέον Σημειώσεις (προαιρετικό)"></textarea>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button type="submit" id="btn-submit-post" class="btn-primary">Δημοσίευση</button>
+                            <button type="button" id="btn-cancel-edit" class="btn-primary bg-red hidden" onclick="cancelEdit()">Ακύρωση</button>
+                        </div>
                     </form>
                     
                     <div>
@@ -391,17 +396,19 @@
                 card.className = 'food-card';
                 if (isSoldOut) card.style.opacity = '0.5';
 
-                card.innerHTML = `
-                    <div class="food-tag" style="${isSoldOut ? 'background:#888;color:white;' : ''}">
-                        ${isSoldOut ? 'Εξαντλήθηκε' : `${post.portions_available} Μερίδες`}
+                card.innerHTML = \`
+                    \${post.photo_url ? \`<img src="\${post.photo_url}" alt="\${post.title}" style="width:100%; height:150px; object-fit:cover; border-radius: var(--radius) var(--radius) 0 0; margin: -1.2rem -1.2rem 0.6rem -1.2rem; max-width: calc(100% + 2.4rem);">\` : ''}
+                    <div class="food-tag" style="\${isSoldOut ? 'background:#888;color:white;' : ''}">
+                        \${isSoldOut ? 'Εξαντλήθηκε' : \`\${post.portions_available} Μερίδες\`}
                     </div>
-                    <h3>${post.title}</h3>
-                    <p>👨‍🍳 ${post.cook_name} | 📍 ${post.pickup_location} | 🕒 ${post.pickup_time}</p>
-                    ${post.distance !== undefined ? `<p style="color:var(--primary-dark); font-weight:bold;">📏 ${post.distance.toFixed(2)} km μακριά</p>` : ''}
-                    ${post.allergens ? `<p style="color:red; font-size:0.85rem">⚠️ ${post.allergens}</p>` : ''}
-                    ${!isSoldOut && post.cook_id !== currentUser.id ? 
-                        `<button class="btn-primary" onclick="requestPortion(${post.id})">Κράτηση (1 🪙)</button>` : ''}
-                `;
+                    <h3>\${post.title}</h3>
+                    <p>👨‍🍳 \${post.cook_name} | 📍 \${post.pickup_location} | 🕒 \${post.pickup_time}</p>
+                    \${post.distance !== undefined ? \`<p style="color:var(--primary-dark); font-weight:bold;">📏 \${post.distance.toFixed(2)} km μακριά</p>\` : ''}
+                    \${post.notes ? \`<p style="font-size:0.9rem; color:var(--muted); margin:0.2rem 0;">📝 \${post.notes}</p>\` : ''}
+                    \${post.allergens ? \`<p style="color:red; font-size:0.85rem">⚠️ \${post.allergens}</p>\` : ''}
+                    \${!isSoldOut && post.cook_id !== currentUser.id ? 
+                        \`<button class="btn-primary" onclick="requestPortion(\${post.id})">Κράτηση (1 🪙)</button>\` : ''}
+                \`;
                 container.appendChild(card);
 
                 // Προσθήκη Marker στο χάρτη
@@ -530,32 +537,81 @@
         }
 
         // -- COOK DASHBOARD (B1, B3) --
-        async function createPost(e) {
+        let editPostId = null;
+
+        async function handlePostSubmit(e) {
             e.preventDefault();
             const payload = {
                 cook_id: currentUser.id, title: document.getElementById('post-title').value,
+                photo_url: document.getElementById('post-photo').value,
                 pickup_location: document.getElementById('post-location').value,
                 pickup_time: document.getElementById('post-time').value,
                 portions: document.getElementById('post-portions').value,
-                allergens: document.getElementById('post-allergens').value
+                allergens: document.getElementById('post-allergens').value,
+                notes: document.getElementById('post-notes').value
             };
+            
             try {
-                const res = await fetch('/api/posts', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-                if (res.ok) { document.getElementById('create-post-form').reset(); loadMyPosts(); }
+                let res;
+                if (editPostId) {
+                    res = await fetch(\`/api/posts/\${editPostId}\`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+                } else {
+                    res = await fetch('/api/posts', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+                }
+                
+                if (res.ok) { 
+                    cancelEdit();
+                    loadMyPosts(); 
+                } else {
+                    const data = await res.json();
+                    alert(data.error || 'Σφάλμα');
+                }
             } catch(e) {}
         }
 
+        function editPost(id) {
+            const post = currentMyPosts.find(p => p.id === id);
+            if (!post) return;
+            
+            editPostId = id;
+            document.getElementById('form-post-title').textContent = 'Επεξεργασία Αγγελίας';
+            document.getElementById('btn-submit-post').textContent = 'Αποθήκευση';
+            document.getElementById('btn-cancel-edit').classList.remove('hidden');
+            
+            document.getElementById('post-title').value = post.title;
+            document.getElementById('post-photo').value = post.photo_url || '';
+            document.getElementById('post-location').value = post.pickup_location;
+            document.getElementById('post-time').value = post.pickup_time;
+            document.getElementById('post-portions').value = post.portions_total;
+            document.getElementById('post-allergens').value = post.allergens || '';
+            document.getElementById('post-notes').value = post.notes || '';
+            
+            window.scrollTo(0, document.getElementById('create-post-form').offsetTop - 20);
+        }
+
+        function cancelEdit() {
+            editPostId = null;
+            document.getElementById('form-post-title').textContent = 'Νέα Αγγελία';
+            document.getElementById('btn-submit-post').textContent = 'Δημοσίευση';
+            document.getElementById('btn-cancel-edit').classList.add('hidden');
+            document.getElementById('create-post-form').reset();
+        }
+
+        let currentMyPosts = [];
         async function loadMyPosts() {
             const container = document.getElementById('my-posts-container');
             try {
-                const res = await fetch(`/api/posts/cook/${currentUser.id}`);
-                const posts = await res.json();
-                container.innerHTML = posts.map(p => `
+                const res = await fetch(\`/api/posts/cook/\${currentUser.id}\`);
+                currentMyPosts = await res.json();
+                container.innerHTML = currentMyPosts.map(p => \`
                     <div style="border-bottom:1px solid #ccc; padding-bottom:10px; margin-bottom:10px;">
-                        <strong>${p.title}</strong> - ${p.portions_available}/${p.portions_total} Μερίδες
-                        <button class="btn-small bg-red" style="float:right;" onclick="deletePost(${p.id})">Διαγραφή</button>
+                        <strong>\${p.title}</strong> - \${p.portions_available}/\${p.portions_total} Μερίδες
+                        <div style="float:right; display:flex; gap: 0.5rem;">
+                            <button class="btn-small bg-blue" onclick="editPost(\${p.id})">Επεξεργασία</button>
+                            <button class="btn-small bg-red" onclick="deletePost(\${p.id})">Διαγραφή</button>
+                        </div>
                     </div>
-                `).join('');
+                \`).join('');
             } catch(e){}
         }
 
