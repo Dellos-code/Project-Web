@@ -2,9 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const db = require('./database'); // Η βάση σου παραμένει ίδια, έχει ήδη τους σωστούς πίνακες!
+const startCronJobs = require('./cron');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+startCronJobs();
 
 app.use(cors());
 app.use(express.json());
