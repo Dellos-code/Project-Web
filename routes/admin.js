@@ -15,9 +15,9 @@ router.get('/stats', (req, res) => {
     });
 });
 
-// Δ2. Leaderboard (Top Donors)
+// Δ2. Leaderboard (Top Donors και Highest-rated meals)
 router.get('/leaderboard', (req, res) => {
-    const query = `
+    const donorsQuery = `
         SELECT u.name, SUM(p.portions_total) as total_portions_donated
         FROM users u
         JOIN posts p ON u.id = p.cook_id
@@ -25,9 +25,24 @@ router.get('/leaderboard', (req, res) => {
         ORDER BY total_portions_donated DESC
         LIMIT 5
     `;
-    db.all(query, [], (err, rows) => {
+    const mealsQuery = `
+        SELECT p.title, u.name as cook_name, AVG(r.score) as avg_score
+        FROM ratings r
+        JOIN deliveries d ON r.delivery_id = d.id
+        JOIN requests req ON d.request_id = req.id
+        JOIN posts p ON req.post_id = p.id
+        JOIN users u ON p.cook_id = u.id
+        GROUP BY p.id
+        ORDER BY avg_score DESC
+        LIMIT 5
+    `;
+    
+    db.all(donorsQuery, [], (err, donors) => {
         if (err) return res.status(500).json({ error: 'Σφάλμα βάσης.' });
-        res.json(rows);
+        db.all(mealsQuery, [], (err, meals) => {
+            if (err) return res.status(500).json({ error: 'Σφάλμα βάσης.' });
+            res.json({ donors, meals });
+        });
     });
 });
 

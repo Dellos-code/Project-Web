@@ -182,15 +182,20 @@
             <section id="cook-view" class="view hidden">
                 <h2>Cook Dashboard</h2>
                 <div class="dashboard-layout">
-                    <!-- Νέα Αγγελία -->
-                    <form id="create-post-form" class="card form-panel" onsubmit="createPost(event)">
-                        <h3>Νέα Αγγελία</h3>
+                    <!-- Νέα / Επεξεργασία Αγγελίας -->
+                    <form id="create-post-form" class="card form-panel" onsubmit="handlePostSubmit(event)">
+                        <h3 id="form-post-title">Νέα Αγγελία</h3>
                         <input id="post-title" type="text" placeholder="Τίτλος (π.χ. Μακαρόνια)" required />
+                        <input id="post-photo" type="url" placeholder="URL Φωτογραφίας (προαιρετικό)" />
                         <input id="post-location" type="text" placeholder="Τοποθεσία (π.χ. Εστία Β)" required />
                         <input id="post-time" type="text" placeholder="Ώρα (π.χ. 14:00)" required />
                         <input id="post-portions" type="number" min="1" placeholder="Μερίδες" required />
                         <input id="post-allergens" type="text" placeholder="Αλλεργιογόνα" />
-                        <button type="submit" class="btn-primary">Δημοσίευση</button>
+                        <textarea id="post-notes" placeholder="Επιπλέον Σημειώσεις (προαιρετικό)"></textarea>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button type="submit" id="btn-submit-post" class="btn-primary">Δημοσίευση</button>
+                            <button type="button" id="btn-cancel-edit" class="btn-primary bg-red hidden" onclick="cancelEdit()">Ακύρωση</button>
+                        </div>
                     </form>
                     
                     <div>
@@ -220,6 +225,10 @@
                     <div class="card form-panel">
                         <h3>Top Donors (Leaderboard)</h3>
                         <ul id="admin-leaderboard" style="padding-left: 1.5rem;"></ul>
+                    </div>
+                    <div class="card form-panel">
+                        <h3>Highest-Rated Meals</h3>
+                        <ul id="admin-top-meals" style="padding-left: 1.5rem;"></ul>
                     </div>
                 </div>
             </section>
@@ -264,6 +273,19 @@
                 navigate('auth');
                 updateNavbar();
             };
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag] || tag)
+            );
         }
 
         function navigate(view) {
@@ -391,17 +413,19 @@
                 card.className = 'food-card';
                 if (isSoldOut) card.style.opacity = '0.5';
 
-                card.innerHTML = `
-                    <div class="food-tag" style="${isSoldOut ? 'background:#888;color:white;' : ''}">
-                        ${isSoldOut ? 'Εξαντλήθηκε' : `${post.portions_available} Μερίδες`}
+                card.innerHTML = \`
+                    \${post.photo_url ? \`<img src="\${escapeHTML(post.photo_url)}" alt="\${escapeHTML(post.title)}" style="width:100%; height:150px; object-fit:cover; border-radius: var(--radius) var(--radius) 0 0; margin: -1.2rem -1.2rem 0.6rem -1.2rem; max-width: calc(100% + 2.4rem);">\` : ''}
+                    <div class="food-tag" style="\${isSoldOut ? 'background:#888;color:white;' : ''}">
+                        \${isSoldOut ? 'Εξαντλήθηκε' : \`\${post.portions_available} Μερίδες\`}
                     </div>
-                    <h3>${post.title}</h3>
-                    <p>👨‍🍳 ${post.cook_name} | 📍 ${post.pickup_location} | 🕒 ${post.pickup_time}</p>
-                    ${post.distance !== undefined ? `<p style="color:var(--primary-dark); font-weight:bold;">📏 ${post.distance.toFixed(2)} km μακριά</p>` : ''}
-                    ${post.allergens ? `<p style="color:red; font-size:0.85rem">⚠️ ${post.allergens}</p>` : ''}
-                    ${!isSoldOut && post.cook_id !== currentUser.id ? 
-                        `<button class="btn-primary" onclick="requestPortion(${post.id})">Κράτηση (1 🪙)</button>` : ''}
-                `;
+                    <h3>\${escapeHTML(post.title)}</h3>
+                    <p>👨‍🍳 \${escapeHTML(post.cook_name)} | 📍 \${escapeHTML(post.pickup_location)} | 🕒 \${escapeHTML(post.pickup_time)}</p>
+                    \${post.distance !== undefined ? \`<p style="color:var(--primary-dark); font-weight:bold;">📏 \${post.distance.toFixed(2)} km μακριά</p>\` : ''}
+                    \${post.notes ? \`<p style="font-size:0.9rem; color:var(--muted); margin:0.2rem 0;">📝 \${escapeHTML(post.notes)}</p>\` : ''}
+                    \${post.allergens ? \`<p style="color:red; font-size:0.85rem">⚠️ \${escapeHTML(post.allergens)}</p>\` : ''}
+                    \${!isSoldOut && post.cook_id !== currentUser.id ? 
+                        \`<button class="btn-primary" onclick="requestPortion(\${post.id})">Κράτηση (1 🪙)</button>\` : ''}
+                \`;
                 container.appendChild(card);
 
                 // Προσθήκη Marker στο χάρτη
@@ -501,7 +525,7 @@
                                     <option value="2">2 Αστέρια ⭐⭐</option>
                                     <option value="1">1 Αστέρι ⭐</option>
                                 </select>
-                                <button class="btn-primary" style="width:auto;" onclick="submitRating(${item.delivery_id})">Βαθμολόγησε</button>
+                                <button class="btn-primary" style="width:auto;" onclick="submitRating(${item.delivery_id}, ${item.cook_id})">Βαθμολόγησε</button>
                             </div>
                         `;
                     } else if (item.score) {
@@ -509,7 +533,7 @@
                     }
 
                     card.innerHTML = `
-                        <h4>${item.title} (Μάγειρας: ${item.cook_name})</h4>
+                        <h4>${escapeHTML(item.title)} (Μάγειρας: ${escapeHTML(item.cook_name)})</h4>
                         <p>Status Αιτήματος: <span class="badge">${item.req_status}</span> | Status Παράδοσης: <span class="badge">${item.del_status || 'N/A'}</span></p>
                         ${actionHtml}
                     `;
@@ -518,44 +542,93 @@
             } catch(e) { console.error(e); }
         }
 
-        async function submitRating(deliveryId) {
+        async function submitRating(deliveryId, cookId) {
             const score = document.getElementById(`rating-score-${deliveryId}`).value;
             try {
                 const res = await fetch('/api/business/rate', {
                     method: 'POST', headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({ delivery_id: deliveryId, rater_id: currentUser.id, score: parseInt(score) })
+                    body: JSON.stringify({ delivery_id: deliveryId, rater_id: currentUser.id, cook_id: cookId, score: parseInt(score) })
                 });
                 if(res.ok) { alert('Ευχαριστούμε για τη βαθμολογία!'); loadHistory(); }
             } catch(e) { alert('Σφάλμα'); }
         }
 
         // -- COOK DASHBOARD (B1, B3) --
-        async function createPost(e) {
+        let editPostId = null;
+
+        async function handlePostSubmit(e) {
             e.preventDefault();
             const payload = {
                 cook_id: currentUser.id, title: document.getElementById('post-title').value,
+                photo_url: document.getElementById('post-photo').value,
                 pickup_location: document.getElementById('post-location').value,
                 pickup_time: document.getElementById('post-time').value,
                 portions: document.getElementById('post-portions').value,
-                allergens: document.getElementById('post-allergens').value
+                allergens: document.getElementById('post-allergens').value,
+                notes: document.getElementById('post-notes').value
             };
+            
             try {
-                const res = await fetch('/api/posts', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-                if (res.ok) { document.getElementById('create-post-form').reset(); loadMyPosts(); }
+                let res;
+                if (editPostId) {
+                    res = await fetch(\`/api/posts/\${editPostId}\`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+                } else {
+                    res = await fetch('/api/posts', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+                }
+                
+                if (res.ok) { 
+                    cancelEdit();
+                    loadMyPosts(); 
+                } else {
+                    const data = await res.json();
+                    alert(data.error || 'Σφάλμα');
+                }
             } catch(e) {}
         }
 
+        function editPost(id) {
+            const post = currentMyPosts.find(p => p.id === id);
+            if (!post) return;
+            
+            editPostId = id;
+            document.getElementById('form-post-title').textContent = 'Επεξεργασία Αγγελίας';
+            document.getElementById('btn-submit-post').textContent = 'Αποθήκευση';
+            document.getElementById('btn-cancel-edit').classList.remove('hidden');
+            
+            document.getElementById('post-title').value = post.title;
+            document.getElementById('post-photo').value = post.photo_url || '';
+            document.getElementById('post-location').value = post.pickup_location;
+            document.getElementById('post-time').value = post.pickup_time;
+            document.getElementById('post-portions').value = post.portions_total;
+            document.getElementById('post-allergens').value = post.allergens || '';
+            document.getElementById('post-notes').value = post.notes || '';
+            
+            window.scrollTo(0, document.getElementById('create-post-form').offsetTop - 20);
+        }
+
+        function cancelEdit() {
+            editPostId = null;
+            document.getElementById('form-post-title').textContent = 'Νέα Αγγελία';
+            document.getElementById('btn-submit-post').textContent = 'Δημοσίευση';
+            document.getElementById('btn-cancel-edit').classList.add('hidden');
+            document.getElementById('create-post-form').reset();
+        }
+
+        let currentMyPosts = [];
         async function loadMyPosts() {
             const container = document.getElementById('my-posts-container');
             try {
-                const res = await fetch(`/api/posts/cook/${currentUser.id}`);
-                const posts = await res.json();
-                container.innerHTML = posts.map(p => `
+                const res = await fetch(\`/api/posts/cook/\${currentUser.id}\`);
+                currentMyPosts = await res.json();
+                container.innerHTML = currentMyPosts.map(p => \`
                     <div style="border-bottom:1px solid #ccc; padding-bottom:10px; margin-bottom:10px;">
-                        <strong>${p.title}</strong> - ${p.portions_available}/${p.portions_total} Μερίδες
-                        <button class="btn-small bg-red" style="float:right;" onclick="deletePost(${p.id})">Διαγραφή</button>
+                        <strong>\${escapeHTML(p.title)}</strong> - \${p.portions_available}/\${p.portions_total} Μερίδες
+                        <div style="float:right; display:flex; gap: 0.5rem;">
+                            <button class="btn-small bg-blue" onclick="editPost(\${p.id})">Επεξεργασία</button>
+                            <button class="btn-small bg-red" onclick="deletePost(\${p.id})">Διαγραφή</button>
+                        </div>
                     </div>
-                `).join('');
+                \`).join('');
             } catch(e){}
         }
 
@@ -607,12 +680,19 @@
                 document.getElementById('admin-total-deliveries').textContent = stats.total_deliveries;
 
                 const resBoard = await fetch('/api/admin/leaderboard');
-                const board = await resBoard.json();
-                document.getElementById('admin-leaderboard').innerHTML = board.map((u, i) => `
+                const data = await resBoard.json();
+                
+                document.getElementById('admin-leaderboard').innerHTML = (data.donors || []).map((u, i) => \`
                     <li style="margin-bottom:0.5rem">
-                        <strong>#${i+1} ${u.name}</strong> - ${u.total_portions_donated} Μερίδες Δωρεά
+                        <strong>#\${i+1} \${u.name}</strong> - \${u.total_portions_donated} Μερίδες Δωρεά
                     </li>
-                `).join('');
+                \`).join('');
+
+                document.getElementById('admin-top-meals').innerHTML = (data.meals || []).map((m, i) => \`
+                    <li style="margin-bottom:0.5rem">
+                        <strong>#\${i+1} \${m.title}</strong> (\${m.cook_name}) - \${Number(m.avg_score).toFixed(1)} ⭐
+                    </li>
+                \`).join('');
             } catch(e) {}
         }
 
