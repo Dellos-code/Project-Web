@@ -19,7 +19,7 @@ router.post('/request', (req, res) => {
 // Ανάκτηση αιτημάτων για τον Μάγειρα
 router.get('/cook-requests/:cook_id', (req, res) => {
     const query = `
-        SELECT r.id as request_id, r.status, p.title, u.name as consumer_name, d.status as delivery_status, d.id as delivery_id
+        SELECT r.id as request_id, r.status, p.title, p.cook_id, u.id as consumer_id, u.name as consumer_name, d.status as delivery_status, d.id as delivery_id
         FROM requests r
         JOIN posts p ON r.post_id = p.id
         JOIN users u ON r.consumer_id = u.id
@@ -81,7 +81,7 @@ router.post('/noshow', (req, res) => {
 // Ανάκτηση Ιστορικού Καταναλωτή
 router.get('/consumer-history/:user_id', (req, res) => {
     const query = `
-        SELECT r.id as request_id, r.status as req_status, p.title, u.name as cook_name, d.id as delivery_id, d.status as del_status, rt.score
+        SELECT r.id as request_id, r.status as req_status, p.title, p.cook_id, u.name as cook_name, d.id as delivery_id, d.status as del_status, rt.score
         FROM requests r
         JOIN posts p ON r.post_id = p.id
         JOIN users u ON p.cook_id = u.id
