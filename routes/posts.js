@@ -79,9 +79,17 @@ router.put('/:id', (req, res) => {
 
 // Διαγραφή αγγελίας (CRUD)
 router.delete('/:id', (req, res) => {
-    db.run(`UPDATE posts SET status = 'deleted', expires_at = datetime('now', '-1 second') WHERE id = ?`, [req.params.id], function(err) {
-        if (err) return res.status(500).json({ error: 'Σφάλμα διαγραφής.' });
-        res.json({ message: 'Η αγγελία διαγράφηκε.' });
+    const { cook_id } = req.body || {};
+    if (!cook_id) return res.status(401).json({ error: 'Απαιτείται ταυτοποίηση.' });
+
+    db.get(`SELECT cook_id FROM posts WHERE id = ?`, [req.params.id], (err, post) => {
+        if (err || !post) return res.status(404).json({ error: 'Αγγελία δεν βρέθηκε.' });
+        if (post.cook_id !== cook_id) return res.status(403).json({ error: 'Μη εξουσιοδοτημένη ενέργεια.' });
+
+        db.run(`UPDATE posts SET status = 'deleted', expires_at = datetime('now', '-1 second') WHERE id = ?`, [req.params.id], function(err) {
+            if (err) return res.status(500).json({ error: 'Σφάλμα διαγραφής.' });
+            res.json({ message: 'Η αγγελία διαγράφηκε.' });
+        });
     });
 });
 

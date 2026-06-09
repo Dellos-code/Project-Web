@@ -646,7 +646,11 @@
 
         async function deletePost(id) {
             if(confirm('Σίγουρα θέλεις να διαγράψεις την αγγελία;')) {
-                await fetch(`/api/posts/${id}`, {method: 'DELETE'});
+                await fetch(`/api/posts/${id}`, {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ cook_id: currentUser.id })
+                });
                 loadMyPosts();
             }
         }
@@ -687,11 +691,12 @@
         // -- ADMIN DASHBOARD (Δ1, Δ2) --
         async function loadAdminData() {
             try {
-                const resStats = await fetch('/api/admin/stats');
+                const uid = currentUser.id;
+                const resStats = await fetch(`/api/admin/stats?user_id=${uid}`);
                 const stats = await resStats.json();
                 document.getElementById('admin-total-deliveries').textContent = stats.total_deliveries;
 
-                const resBoard = await fetch('/api/admin/leaderboard');
+                const resBoard = await fetch(`/api/admin/leaderboard?user_id=${uid}`);
                 const data = await resBoard.json();
                 
                 document.getElementById('admin-leaderboard').innerHTML = (data.donors || []).map((u, i) => `
