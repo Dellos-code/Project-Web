@@ -80,6 +80,13 @@ function initializeDB() {
             FOREIGN KEY (user_id) REFERENCES users(id)
         )`);
         
+        // Μετάβαση: προσθήκη pickup_date αν δεν υπάρχει ήδη
+        db.all(`PRAGMA table_info(posts)`, (err, columns) => {
+            if (!err && columns && !columns.some(c => c.name === 'pickup_date')) {
+                db.run(`ALTER TABLE posts ADD COLUMN pickup_date TEXT`);
+            }
+        });
+
         console.log('Οι πίνακες της βάσης δεδομένων ελέγχθηκαν/δημιουργήθηκαν με επιτυχία.');
     });
 }

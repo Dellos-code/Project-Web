@@ -56,4 +56,11 @@ router.post('/login', (req, res) => {
     });
 });
 
+router.get('/me/:id', (req, res) => {
+    db.get('SELECT id, name, role, credits FROM users WHERE id = ?', [req.params.id], (err, user) => {
+        if (err || !user) return res.status(404).json({ error: 'Χρήστης δεν βρέθηκε.' });
+        res.json({ user });
+    });
+});
+
 module.exports = router;

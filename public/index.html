@@ -188,7 +188,11 @@
                         <input id="post-title" type="text" placeholder="Τίτλος (π.χ. Μακαρόνια)" required />
                         <input id="post-photo" type="url" placeholder="URL Φωτογραφίας (προαιρετικό)" />
                         <input id="post-location" type="text" placeholder="Τοποθεσία (π.χ. Εστία Β)" required />
-                        <input id="post-time" type="time" placeholder="Ώρα" required />
+                        <label style="margin-top:0.2rem; font-size:0.88rem; font-weight:600;">Ημερομηνία & Ώρα Παραλαβής</label>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                            <input id="post-date" type="date" required />
+                            <input id="post-time" type="time" required />
+                        </div>
                         <input id="post-portions" type="number" min="1" placeholder="Μερίδες" required />
                         <input id="post-allergens" type="text" placeholder="Αλλεργιογόνα" />
                         <textarea id="post-notes" placeholder="Επιπλέον Σημειώσεις (προαιρετικό)"></textarea>
@@ -324,9 +328,13 @@
 
         async function fetchCredits(userId) {
             try {
-                // Χρησιμοποιούμε fake login (re-fetch) για τα credits, ή απλά τα κρατάμε τοπικά αν βαριόμαστε. 
-                // Εδώ απλά δείχνουμε την τιμή localStorage.
-                document.getElementById('user-credits').textContent = currentUser.credits;
+                const res = await fetch(`/api/auth/me/${userId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    currentUser.credits = data.user.credits;
+                    localStorage.setItem('unibite_user', JSON.stringify(currentUser));
+                    document.getElementById('user-credits').textContent = currentUser.credits;
+                }
             } catch(e) {}
         }
 
@@ -420,7 +428,8 @@
                         \${isSoldOut ? 'Εξαντλήθηκε' : \`\${post.portions_available} Μερίδες\`}
                     </div>
                     <h3>\${escapeHTML(post.title)}</h3>
-                    <p>👨‍🍳 \${escapeHTML(post.cook_name)} | 📍 \${escapeHTML(post.pickup_location)} | 🕒 \${escapeHTML(post.pickup_time)}</p>
+                    <p>👨‍🍳 \${escapeHTML(post.cook_name)} | 📍 \${escapeHTML(post.pickup_location)}</p>
+                    <p>📅 \${post.pickup_date ? post.pickup_date.split('-').reverse().join('/') : 'N/A'} &nbsp;🕒 \${escapeHTML(post.pickup_time)}</p>
                     \${post.distance !== undefined ? \`<p style="color:var(--primary-dark); font-weight:bold;">📏 \${post.distance.toFixed(2)} km μακριά</p>\` : ''}
                     \${post.notes ? \`<p style="font-size:0.9rem; color:var(--muted); margin:0.2rem 0;">📝 \${escapeHTML(post.notes)}</p>\` : ''}
                     \${post.allergens ? \`<p style="color:red; font-size:0.85rem">⚠️ \${escapeHTML(post.allergens)}</p>\` : ''}
@@ -563,6 +572,7 @@
                 cook_id: currentUser.id, title: document.getElementById('post-title').value,
                 photo_url: document.getElementById('post-photo').value,
                 pickup_location: document.getElementById('post-location').value,
+                pickup_date: document.getElementById('post-date').value,
                 pickup_time: document.getElementById('post-time').value,
                 portions: document.getElementById('post-portions').value,
                 allergens: document.getElementById('post-allergens').value,
@@ -599,6 +609,7 @@
             document.getElementById('post-title').value = post.title;
             document.getElementById('post-photo').value = post.photo_url || '';
             document.getElementById('post-location').value = post.pickup_location;
+            document.getElementById('post-date').value = post.pickup_date || '';
             document.getElementById('post-time').value = post.pickup_time;
             document.getElementById('post-portions').value = post.portions_total;
             document.getElementById('post-allergens').value = post.allergens || '';
