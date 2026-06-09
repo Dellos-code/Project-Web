@@ -422,20 +422,20 @@
                 card.className = 'food-card';
                 if (isSoldOut) card.style.opacity = '0.5';
 
-                card.innerHTML = \`
-                    \${post.photo_url ? \`<img src="\${escapeHTML(post.photo_url)}" alt="\${escapeHTML(post.title)}" style="width:100%; height:150px; object-fit:cover; border-radius: var(--radius) var(--radius) 0 0; margin: -1.2rem -1.2rem 0.6rem -1.2rem; max-width: calc(100% + 2.4rem);">\` : ''}
-                    <div class="food-tag" style="\${isSoldOut ? 'background:#888;color:white;' : ''}">
-                        \${isSoldOut ? 'Εξαντλήθηκε' : \`\${post.portions_available} Μερίδες\`}
+                card.innerHTML = `
+                    ${post.photo_url ? `<img src="${escapeHTML(post.photo_url)}" alt="${escapeHTML(post.title)}" style="width:100%; height:150px; object-fit:cover; border-radius: var(--radius) var(--radius) 0 0; margin: -1.2rem -1.2rem 0.6rem -1.2rem; max-width: calc(100% + 2.4rem);">` : ''}
+                    <div class="food-tag" style="${isSoldOut ? 'background:#888;color:white;' : ''}">
+                        ${isSoldOut ? 'Εξαντλήθηκε' : `${post.portions_available} Μερίδες`}
                     </div>
-                    <h3>\${escapeHTML(post.title)}</h3>
-                    <p>👨‍🍳 \${escapeHTML(post.cook_name)} | 📍 \${escapeHTML(post.pickup_location)}</p>
-                    <p>📅 \${post.pickup_date ? post.pickup_date.split('-').reverse().join('/') : 'N/A'} &nbsp;🕒 \${escapeHTML(post.pickup_time)}</p>
-                    \${post.distance !== undefined ? \`<p style="color:var(--primary-dark); font-weight:bold;">📏 \${post.distance.toFixed(2)} km μακριά</p>\` : ''}
-                    \${post.notes ? \`<p style="font-size:0.9rem; color:var(--muted); margin:0.2rem 0;">📝 \${escapeHTML(post.notes)}</p>\` : ''}
-                    \${post.allergens ? \`<p style="color:red; font-size:0.85rem">⚠️ \${escapeHTML(post.allergens)}</p>\` : ''}
-                    \${!isSoldOut && post.cook_id !== currentUser.id ? 
-                        \`<button class="btn-primary" onclick="requestPortion(\${post.id})">Κράτηση (1 🪙)</button>\` : ''}
-                \`;
+                    <h3>${escapeHTML(post.title)}</h3>
+                    <p>👨‍🍳 ${escapeHTML(post.cook_name)} | 📍 ${escapeHTML(post.pickup_location)}</p>
+                    <p>📅 ${post.pickup_date ? post.pickup_date.split('-').reverse().join('/') : 'N/A'} &nbsp;🕒 ${escapeHTML(post.pickup_time)}</p>
+                    ${post.distance !== undefined ? `<p style="color:var(--primary-dark); font-weight:bold;">📏 ${post.distance.toFixed(2)} km μακριά</p>` : ''}
+                    ${post.notes ? `<p style="font-size:0.9rem; color:var(--muted); margin:0.2rem 0;">📝 ${escapeHTML(post.notes)}</p>` : ''}
+                    ${post.allergens ? `<p style="color:red; font-size:0.85rem">⚠️ ${escapeHTML(post.allergens)}</p>` : ''}
+                    ${!isSoldOut && post.cook_id !== currentUser.id ?
+                        `<button class="btn-primary" onclick="requestPortion(${post.id})">Κράτηση (1 🪙)</button>` : ''}
+                `;
                 container.appendChild(card);
 
                 // Προσθήκη Marker στο χάρτη
@@ -582,7 +582,7 @@
             try {
                 let res;
                 if (editPostId) {
-                    res = await fetch(\`/api/posts/\${editPostId}\`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+                    res = await fetch(`/api/posts/${editPostId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
                 } else {
                     res = await fetch('/api/posts', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
                 }
@@ -630,17 +630,17 @@
         async function loadMyPosts() {
             const container = document.getElementById('my-posts-container');
             try {
-                const res = await fetch(\`/api/posts/cook/\${currentUser.id}\`);
+                const res = await fetch(`/api/posts/cook/${currentUser.id}`);
                 currentMyPosts = await res.json();
-                container.innerHTML = currentMyPosts.map(p => \`
+                container.innerHTML = currentMyPosts.map(p => `
                     <div style="border-bottom:1px solid #ccc; padding-bottom:10px; margin-bottom:10px;">
-                        <strong>\${escapeHTML(p.title)}</strong> - \${p.portions_available}/\${p.portions_total} Μερίδες
+                        <strong>${escapeHTML(p.title)}</strong> - ${p.portions_available}/${p.portions_total} Μερίδες
                         <div style="float:right; display:flex; gap: 0.5rem;">
-                            <button class="btn-small bg-blue" onclick="editPost(\${p.id})">Επεξεργασία</button>
-                            <button class="btn-small bg-red" onclick="deletePost(\${p.id})">Διαγραφή</button>
+                            <button class="btn-small bg-blue" onclick="editPost(${p.id})">Επεξεργασία</button>
+                            <button class="btn-small bg-red" onclick="deletePost(${p.id})">Διαγραφή</button>
                         </div>
                     </div>
-                \`).join('');
+                `).join('');
             } catch(e){}
         }
 
@@ -694,17 +694,17 @@
                 const resBoard = await fetch('/api/admin/leaderboard');
                 const data = await resBoard.json();
                 
-                document.getElementById('admin-leaderboard').innerHTML = (data.donors || []).map((u, i) => \`
+                document.getElementById('admin-leaderboard').innerHTML = (data.donors || []).map((u, i) => `
                     <li style="margin-bottom:0.5rem">
-                        <strong>#\${i+1} \${u.name}</strong> - \${u.total_portions_donated} Μερίδες Δωρεά
+                        <strong>#${i+1} ${u.name}</strong> - ${u.total_portions_donated} Μερίδες Δωρεά
                     </li>
-                \`).join('');
+                `).join('');
 
-                document.getElementById('admin-top-meals').innerHTML = (data.meals || []).map((m, i) => \`
+                document.getElementById('admin-top-meals').innerHTML = (data.meals || []).map((m, i) => `
                     <li style="margin-bottom:0.5rem">
-                        <strong>#\${i+1} \${m.title}</strong> (\${m.cook_name}) - \${Number(m.avg_score).toFixed(1)} ⭐
+                        <strong>#${i+1} ${m.title}</strong> (${m.cook_name}) - ${Number(m.avg_score).toFixed(1)} ⭐
                     </li>
-                \`).join('');
+                `).join('');
             } catch(e) {}
         }
 
