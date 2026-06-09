@@ -2,8 +2,18 @@ const express = require('express');
 const router = express.Router();
 const db = require('../database');
 
+// Middleware: require admin role
+function requireAdmin(req, res, next) {
+    const userId = req.query.user_id;
+    if (!userId) return res.status(401).json({ error: 'Απαιτείται σύνδεση.' });
+    db.get(`SELECT role FROM users WHERE id = ?`, [userId], (err, user) => {
+        if (err || !user || user.role !== 'admin') return res.status(403).json({ error: 'Απαιτούνται δικαιώματα διαχειριστή.' });
+        next();
+    });
+}
+
 // Δ1. Συνολικά Στατιστικά (Επιτυχείς παραδόσεις τον τελευταίο μήνα)
-router.get('/stats', (req, res) => {
+router.get('/stats', requireAdmin, (req, res) => {
     const query = `
         SELECT COUNT(*) as total_deliveries 
         FROM deliveries 
@@ -16,7 +26,7 @@ router.get('/stats', (req, res) => {
 });
 
 // Δ2. Leaderboard (Top Donors και Highest-rated meals)
-router.get('/leaderboard', (req, res) => {
+router.get('/leaderboard', requireAdmin, (req, res) => {
     const donorsQuery = `
         SELECT u.name, SUM(p.portions_total) as total_portions_donated
         FROM users u
