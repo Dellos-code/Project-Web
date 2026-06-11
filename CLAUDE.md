@@ -33,7 +33,7 @@ Do not deviate from these:
 - **Fetch API only** for client-server communication.
 - **Leaflet.js** for the map; geolocation filtering and distance sorting are required features.
 - **48-hour post expiry** enforced via SQLite `datetime('now', '+48 hours')`.
-- **Credit system** is mandatory: new user +5, request -1, no-show -1, no-rating-in-48h -1, good rating (score > 3) gives cook +1.
+- **Credit system** is mandatory: new user +5, request -1, no-show -1, no-rating-in-48h -1, confirmed pickup gives cook +1.
 
 ## Credits & Business Logic Flow
 
@@ -41,8 +41,8 @@ All credit movements are recorded in `credit_ledger`. The lifecycle:
 
 1. Consumer requests a portion → -1 credit immediately.
 2. Cook approves → a `deliveries` row is created (`status: pending`).
-3. Cook marks delivery complete → `status: completed`.
-4. Consumer rates within 48h → if `score > 3`, cook gets +1 credit.
+3. Cook marks delivery complete → `status: completed` **and cook receives +1 credit immediately**.
+4. Consumer rates within 48h → rating is recorded for feedback only; no credit movement.
 5. `cron.js` runs hourly: finds completed deliveries older than 48h with no rating → auto-rates 3 stars and deducts 1 credit from consumer.
 
 ## API Routes
