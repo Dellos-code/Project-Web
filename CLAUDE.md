@@ -42,7 +42,7 @@ All credit movements are recorded in `credit_ledger`. The lifecycle:
 1. Consumer requests a portion → -1 credit immediately.
 2. Cook approves → a `deliveries` row is created (`status: pending`).
 3. Cook marks delivery complete → `status: completed` **and cook receives +1 credit immediately**.
-4. Consumer rates within 48h → rating is recorded for feedback only; no credit movement.
+4. Consumer rates within 48h → if score is 4 or 5 stars, cook receives **+1 bonus credit immediately**; 1–3 stars → rating recorded for feedback only, no credit movement.
 5. `cron.js` runs hourly: finds completed deliveries older than 48h with no rating → auto-rates 3 stars and deducts 1 credit from consumer.
 
 ## API Routes

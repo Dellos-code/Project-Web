@@ -161,19 +161,51 @@ router.get('/consumer-history/:user_id', (req, res) => {
     });
 });
 
-// Βαθμολογία (Rating) — μόνο καταχώρηση βαθμού, χωρίς πόντους (ο μάγειρας πήρε +1 στο complete-delivery)
+// Βαθμολογία (Rating) — score >= 4: +1 bonus credit στον μάγειρα αμέσως
 router.post('/rate', (req, res) => {
     const { delivery_id, rater_id, score, comment } = req.body;
+    const parsedScore = parseInt(score, 10);
+    if (isNaN(parsedScore) || parsedScore < 1 || parsedScore > 5) {
+        return res.status(400).json({ error: 'Η βαθμολογία πρέπει να είναι μεταξύ 1 και 5.' });
+    }
+
     db.get(`SELECT id FROM ratings WHERE delivery_id = ?`, [delivery_id], (err, existing) => {
         if (err) return res.status(500).json({ error: 'Σφάλμα βάσης.' });
         if (existing) return res.status(400).json({ error: 'Έχετε ήδη βαθμολογήσει αυτή την παραγγελία.' });
 
-        const parsedScore = parseInt(score, 10);
-        db.run(`INSERT INTO ratings (delivery_id, rater_id, score, comment) VALUES (?, ?, ?, ?)`,
-            [delivery_id, rater_id, parsedScore, comment], function(err) {
-            if (err) return res.status(500).json({ error: 'Σφάλμα καταχώρησης βαθμολογίας.' });
-            res.json({ message: 'Η βαθμολογία καταχωρήθηκε!' });
-        });
+        if (parsedScore >= 4) {
+            // Fetch cook_id from DB — never trust the client for credit writes
+            db.get(
+                `SELECT p.cook_id FROM deliveries d JOIN requests r ON d.request_id = r.id JOIN posts p ON r.post_id = p.id WHERE d.id = ?`,
+                [delivery_id], (err, cookRow) => {
+                if (err || !cookRow) return res.status(404).json({ error: 'Δεν βρέθηκε η παράδοση.' });
+
+                db.serialize(() => {
+                    db.run('BEGIN TRANSACTION');
+                    db.run(
+                        `INSERT INTO ratings (delivery_id, rater_id, score, comment) VALUES (?, ?, ?, ?)`,
+                        [delivery_id, rater_id, parsedScore, comment], function(err) {
+                        if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: 'Σφάλμα καταχώρησης βαθμολογίας.' }); }
+                        const ratingId = this.lastID;
+                        db.run(`UPDATE users SET credits = credits + 1 WHERE id = ?`, [cookRow.cook_id]);
+                        db.run(
+                            `INSERT INTO credit_ledger (user_id, delta, reason, ref_type, ref_id) VALUES (?, 1, 'high_rating_bonus', 'rating', ?)`,
+                            [cookRow.cook_id, ratingId], function(err) {
+                            if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: 'Σφάλμα πόντων.' }); }
+                            db.run('COMMIT');
+                            res.json({ message: 'Η βαθμολογία καταχωρήθηκε! Ο μάγειρας έλαβε bonus πόντο!', bonusAwarded: true });
+                        });
+                    });
+                });
+            });
+        } else {
+            db.run(
+                `INSERT INTO ratings (delivery_id, rater_id, score, comment) VALUES (?, ?, ?, ?)`,
+                [delivery_id, rater_id, parsedScore, comment], function(err) {
+                if (err) return res.status(500).json({ error: 'Σφάλμα καταχώρησης βαθμολογίας.' });
+                res.json({ message: 'Η βαθμολογία καταχωρήθηκε!', bonusAwarded: false });
+            });
+        }
     });
 });
 
