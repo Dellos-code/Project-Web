@@ -97,15 +97,25 @@ router.post('/reject', (req, res) => {
     });
 });
 
-// Ολοκλήρωση Παράδοσης (Από μάγειρα)
+// Ολοκλήρωση Παράδοσης (Από μάγειρα) — +1 credit στον μάγειρα την ώρα της παραλαβής
 router.post('/complete-delivery', (req, res) => {
-    db.get(`SELECT status FROM deliveries WHERE id = ?`, [req.body.delivery_id], (err, row) => {
+    const { delivery_id } = req.body;
+    db.get(
+        `SELECT d.status, p.cook_id FROM deliveries d JOIN requests r ON d.request_id = r.id JOIN posts p ON r.post_id = p.id WHERE d.id = ?`,
+        [delivery_id], (err, row) => {
         if (err || !row) return res.status(404).json({ error: 'Δεν βρέθηκε.' });
         if (row.status !== 'pending') return res.status(400).json({ error: 'Η παράδοση έχει ήδη ολοκληρωθεί ή ακυρωθεί.' });
 
-        db.run(`UPDATE deliveries SET status = 'completed', created_at = CURRENT_TIMESTAMP WHERE id = ?`, [req.body.delivery_id], (err) => {
-            if (err) return res.status(500).json({ error: 'Σφάλμα.' });
-            res.json({ message: 'Η παράδοση ολοκληρώθηκε επιτυχώς.' });
+        db.serialize(() => {
+            db.run('BEGIN TRANSACTION');
+            db.run(`UPDATE deliveries SET status = 'completed', created_at = CURRENT_TIMESTAMP WHERE id = ?`, [delivery_id]);
+            db.run(`UPDATE users SET credits = credits + 1 WHERE id = ?`, [row.cook_id]);
+            db.run(`INSERT INTO credit_ledger (user_id, delta, reason, ref_type, ref_id) VALUES (?, 1, 'delivery_completed', 'delivery', ?)`,
+                [row.cook_id, delivery_id], function(err) {
+                if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: 'Σφάλμα.' }); }
+                db.run('COMMIT');
+                res.json({ message: 'Η παράδοση ολοκληρώθηκε επιτυχώς.' });
+            });
         });
     });
 });
@@ -151,39 +161,18 @@ router.get('/consumer-history/:user_id', (req, res) => {
     });
 });
 
-// Βαθμολογία (Rating) -> +1 credit (base) + +1 bonus αν score >= 4
+// Βαθμολογία (Rating) — μόνο καταχώρηση βαθμού, χωρίς πόντους (ο μάγειρας πήρε +1 στο complete-delivery)
 router.post('/rate', (req, res) => {
     const { delivery_id, rater_id, score, comment } = req.body;
     db.get(`SELECT id FROM ratings WHERE delivery_id = ?`, [delivery_id], (err, existing) => {
         if (err) return res.status(500).json({ error: 'Σφάλμα βάσης.' });
         if (existing) return res.status(400).json({ error: 'Έχετε ήδη βαθμολογήσει αυτή την παραγγελία.' });
 
-        // Derive cook_id from the database — never trust a client-supplied value for credit writes
-        db.get(`SELECT p.cook_id FROM deliveries d JOIN requests r ON d.request_id = r.id JOIN posts p ON r.post_id = p.id WHERE d.id = ?`,
-            [delivery_id], (err, post) => {
-            if (err || !post) return res.status(500).json({ error: 'Σφάλμα εύρεσης παραγγελίας.' });
-
-            const parsedScore = parseInt(score, 10);
-            // Rule: 1 base point for any rating, +1 bonus for score >= 4 (total 2 for good ratings)
-            const pointsToAdd = parsedScore >= 4 ? 2 : 1;
-
-            console.log('[RATE] delivery_id:', delivery_id, '| score:', parsedScore, '| cook_id:', post.cook_id, '| pointsToAdd:', pointsToAdd);
-
-            db.serialize(() => {
-                db.run("BEGIN TRANSACTION");
-                db.run(`INSERT INTO ratings (delivery_id, rater_id, score, comment) VALUES (?, ?, ?, ?)`,
-                    [delivery_id, rater_id, parsedScore, comment]);
-                db.run(`UPDATE users SET credits = credits + ? WHERE id = ?`, [pointsToAdd, post.cook_id], function(err) {
-                    if (err) console.error('[RATE] UPDATE users failed:', err.message);
-                    else console.log('[RATE] Cook', post.cook_id, 'credits updated — rows changed:', this.changes);
-                });
-                db.run(`INSERT INTO credit_ledger (user_id, delta, reason, ref_type, ref_id) VALUES (?, ?, ?, 'delivery', ?)`,
-                    [post.cook_id, pointsToAdd, parsedScore >= 4 ? 'good_rating_bonus' : 'rating_base_credit', delivery_id]);
-                db.run("COMMIT", (err) => {
-                    if (err) return res.status(500).json({ error: 'Σφάλμα.' });
-                    res.json({ message: 'Η βαθμολογία καταχωρήθηκε!' });
-                });
-            });
+        const parsedScore = parseInt(score, 10);
+        db.run(`INSERT INTO ratings (delivery_id, rater_id, score, comment) VALUES (?, ?, ?, ?)`,
+            [delivery_id, rater_id, parsedScore, comment], function(err) {
+            if (err) return res.status(500).json({ error: 'Σφάλμα καταχώρησης βαθμολογίας.' });
+            res.json({ message: 'Η βαθμολογία καταχωρήθηκε!' });
         });
     });
 });
